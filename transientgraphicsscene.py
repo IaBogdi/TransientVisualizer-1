@@ -16,18 +16,20 @@ class ImageGraphicsScene(QGraphicsScene):
         QGraphicsScene.__init__(self, parent)
         self.main_window = main_window
         self.ctrl_pressed = False
+        self.base_img = np.copy(img)
         self.img = np.copy(img)
         self.is_gray = as_grayscale
         self.qImg = ""
         self.lut = np.copy(lut)
         self.height, self.width = img.shape
         self.bytesPerLine = self.width
+        self.intensity_scale = 1.0
         if as_grayscale:
-            self.qImg = QGraphicsPixmapItem(QPixmap(QImage(self.img.data, self.width, self.height, self.bytesPerLine, QImage.Format_Grayscale8)))
+            q_img = QImage(self.img.data, self.width, self.height, self.bytesPerLine, QImage.Format_Grayscale8)
         else:
-            qI = QImage(self.img.data, self.width, self.height, self.bytesPerLine, QImage.Format_Indexed8)
-            qI.setColorTable(lut)
-            self.qImg = QGraphicsPixmapItem(QPixmap(qI))
+            q_img = QImage(self.img.data, self.width, self.height, self.bytesPerLine, QImage.Format_Indexed8)
+            q_img.setColorTable(lut)
+        self.qImg = QGraphicsPixmapItem(QPixmap(q_img))
         self.qImg.setTransformationMode(Qt.SmoothTransformation)
         self.qImg.setFlag(QGraphicsItem.ItemIsMovable)
         self.addItem(self.qImg)
@@ -37,6 +39,20 @@ class ImageGraphicsScene(QGraphicsScene):
         self.v_pen = None #pen for vertical line
         self.moving_line = None #temporary line for the movement of line
         self.mouse_pressed = False
+
+    def UpdatePixmap(self):
+        if self.is_gray:
+            q_img = QImage(self.img.data, self.width, self.height, self.bytesPerLine, QImage.Format_Grayscale8)
+        else:
+            q_img = QImage(self.img.data, self.width, self.height, self.bytesPerLine, QImage.Format_Indexed8)
+            q_img.setColorTable(self.lut)
+        self.qImg.setPixmap(QPixmap(q_img))
+
+    def SetIntensityScale(self, value):
+        self.intensity_scale = value
+        scaled_img = np.clip(self.base_img.astype(np.float64) * value, 0, 255)
+        self.img = scaled_img.astype(np.uint8)
+        self.UpdatePixmap()
 
     def wheelEvent(self,event):
         if self.ctrl_pressed:

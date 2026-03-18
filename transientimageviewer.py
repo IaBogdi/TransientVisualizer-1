@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import  QSizePolicy, QCheckBox, QSpinBox, QPushButton, QWidget, QSlider, QHBoxLayout, QVBoxLayout
+from PyQt5.QtWidgets import  QSizePolicy, QCheckBox, QSpinBox, QPushButton, QWidget, QSlider, QHBoxLayout, QVBoxLayout, QLabel, QDoubleSpinBox
 from PyQt5.QtCore import Qt
 from PyQt5 import QtCore
 
@@ -13,6 +13,7 @@ class ImageViewer(QWidget):
     sync_scale_x = QtCore.pyqtSignal(float)
     sync_scale_y = QtCore.pyqtSignal(float)
     sync_change_mode = QtCore.pyqtSignal()
+    sync_intensity = QtCore.pyqtSignal(float)
     
     def __init__(self,img,as_grayscale,lut,main_window):
         super().__init__()
@@ -38,6 +39,25 @@ class ImageViewer(QWidget):
         self.zoom_Y.setChecked(False)
         self.button_line = QPushButton("Space",self)
         self.button_line.clicked.connect(self.ChangeMode)
+        self.intensity_label = QLabel("Intensity")
+        self.intensity_spinbox = QDoubleSpinBox()
+        self.intensity_spinbox.setMinimum(1.0)
+        self.intensity_spinbox.setMaximum(25.0)
+        self.intensity_spinbox.setSingleStep(0.1)
+        self.intensity_spinbox.setDecimals(1)
+        self.intensity_spinbox.setValue(1.0)
+        self.intensity_spinbox.valueChanged.connect(self.ChangeIntensity)
+        self.intensity_slider = QSlider(Qt.Horizontal)
+        self.intensity_slider.setMinimum(10)
+        self.intensity_slider.setMaximum(250)
+        self.intensity_slider.setValue(10)
+        self.intensity_slider.setTracking(False)
+        self.intensity_slider.sliderMoved.connect(self.PreviewIntensityFromSlider)
+        self.intensity_slider.sliderReleased.connect(self.ChangeIntensityFromSlider)
+        intensity_layout = QHBoxLayout()
+        intensity_layout.addWidget(self.intensity_label)
+        intensity_layout.addWidget(self.intensity_spinbox)
+        intensity_layout.addWidget(self.intensity_slider)
         #create layout and synchronize them
         buttons_layout = QHBoxLayout()
         buttons_layout.addWidget(self.zoom_value_X)
@@ -75,6 +95,7 @@ class ImageViewer(QWidget):
         layout_h.addLayout(layout_v)
         
         layout_submain = QVBoxLayout()
+        layout_submain.addLayout(intensity_layout)
         layout_submain.addLayout(buttons_layout)
         layout_submain.addLayout(layout_h)
         layout = QVBoxLayout()
@@ -163,3 +184,28 @@ class ImageViewer(QWidget):
     def ChangeMode(self):
         self.ChangeModeExt()
         self.sync_change_mode.emit()
+
+    def UpdateIntensityControls(self, value):
+        slider_value = int(round(value * 10))
+        self.intensity_spinbox.blockSignals(True)
+        self.intensity_slider.blockSignals(True)
+        self.intensity_spinbox.setValue(value)
+        self.intensity_slider.setValue(slider_value)
+        self.intensity_spinbox.blockSignals(False)
+        self.intensity_slider.blockSignals(False)
+
+    def ChangeIntensityExt(self, value):
+        self.UpdateIntensityControls(value)
+        self.scene.SetIntensityScale(value)
+
+    def ChangeIntensity(self, value):
+        self.ChangeIntensityExt(value)
+        self.sync_intensity.emit(value)
+
+    def PreviewIntensityFromSlider(self, value):
+        self.intensity_spinbox.blockSignals(True)
+        self.intensity_spinbox.setValue(value / 10.0)
+        self.intensity_spinbox.blockSignals(False)
+
+    def ChangeIntensityFromSlider(self):
+        self.ChangeIntensity(self.intensity_slider.sliderPosition() / 10.0)

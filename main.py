@@ -276,7 +276,7 @@ class MainWindow(QMainWindow):
             # add image
             self.ClearAll()
             self.file_name = project_data["filename"]
-            tif = tifffile.TiffFile(f"{self.path}\{self.file_name}")
+            tif = tifffile.TiffFile(os.path.join(self.path, self.file_name))
             self.image_name, ext = os.path.splitext(self.file_name)
             while ext:
                 self.image_name, ext = os.path.splitext(self.image_name)
@@ -288,7 +288,7 @@ class MainWindow(QMainWindow):
             self.dt = float(tree.findall('.//{http://www.openmicroscopy.org/Schemas/OME/2016-06}Pixels')[0].attrib["PhysicalSizeY"]) # 'cause usually in seconds
             self.dt_spinbox.setValue(self.dt)
             self.dx_spinbox.setValue(self.dx)
-            self.status.setText("Current Image: " + f"{self.path}\{self.file_name}")
+            self.status.setText("Current Image: " + os.path.join(self.path, self.file_name))
             self.time_points = ["Start","End"]
             self.SetImageViewer()
             # add lines
@@ -860,6 +860,8 @@ class MainWindow(QMainWindow):
         self.img_viewer.widget(1).sync_scale_y.connect(self.img_viewer.widget(0).ChangeScaleYExt)
         self.img_viewer.widget(0).sync_change_mode.connect(self.img_viewer.widget(1).ChangeModeExt)
         self.img_viewer.widget(1).sync_change_mode.connect(self.img_viewer.widget(0).ChangeModeExt)
+        self.img_viewer.widget(0).sync_intensity.connect(self.img_viewer.widget(1).ChangeIntensityExt)
+        self.img_viewer.widget(1).sync_intensity.connect(self.img_viewer.widget(0).ChangeIntensityExt)
         
     def SetInfo(self,x,y):
         Dx = x*self.dx*1e-3
@@ -926,4 +928,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
