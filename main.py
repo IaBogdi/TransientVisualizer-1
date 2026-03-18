@@ -333,19 +333,24 @@ class MainWindow(QMainWindow):
             return
         idx_project = None
         idx_project_int = 0
-        while(os.path.exists(f"{self.path}\{self.image_name}{idx_project or ''}.casar")):
+        project_stem = f"{self.image_name}{idx_project or ''}"
+        project_path = os.path.join(self.path, f"{project_stem}.casar")
+        while os.path.exists(project_path):
             if idx_project is None:
                 idx_project_int = 1
             else:
                 idx_project_int += 1
             idx_project = f"_{idx_project_int}"
+            project_stem = f"{self.image_name}{idx_project}"
+            project_path = os.path.join(self.path, f"{project_stem}.casar")
         cols = ["time, ms","F, AU", "L, um"]
         data_F = np.zeros((self.t_F.shape[0],2))
         data_F[:,0] = self.t_F
         data_F[:,1] = self.F
         dict_bg = dict(Background_mean=self.bg_mean, Background_std=self.bg_std)
         data_bg = pd.DataFrame(dict_bg, index=[0])
-        writer = pd.ExcelWriter(f"{self.path}\{self.image_name}{idx_project or ''}_F.xlsx", engine='xlsxwriter')
+        fluo_xlsx_path = os.path.join(self.path, f"{project_stem}_F.xlsx")
+        writer = pd.ExcelWriter(fluo_xlsx_path, engine='xlsxwriter')
         # Write each dataframe to a different file.
         cols = ["time, ms","F, AU"]
         data = pd.DataFrame(data_F,columns=cols)
@@ -362,7 +367,8 @@ class MainWindow(QMainWindow):
             data_L[:,1] = self.L_no_local_outliers
         cols = ["time, ms", "L, um"]
         data = pd.DataFrame(data_L,columns=cols)
-        writer = pd.ExcelWriter(f"{self.path}\{self.image_name}{idx_project or ''}_L.xlsx", engine='xlsxwriter')
+        length_xlsx_path = os.path.join(self.path, f"{project_stem}_L.xlsx")
+        writer = pd.ExcelWriter(length_xlsx_path, engine='xlsxwriter')
         data.to_excel(writer, sheet_name='Length', index = False)
         writer.save()
         project = {}
@@ -387,7 +393,7 @@ class MainWindow(QMainWindow):
             "Max length": self.MaximumOutlierSpinBox.value(),
             "Window size": self.WindowSizeOutlierSpinBox.value()
             }
-        with open(f"{self.path}\{self.image_name}{idx_project or ''}.casar", "w") as outfile:
+        with open(project_path, "w") as outfile:
             json.dump(project, outfile)
         self.MessageWindow = QMessageBox()
         self.MessageWindow.setWindowTitle("Status")
@@ -439,7 +445,7 @@ class MainWindow(QMainWindow):
         with multiprocessing.Pool(self.ParallelSpinBox.value()) as pool:
             L = pool.map(process_element, args_list)
         self.L = np.array(L) 
-        self.t_L = np.arange(idx_start*self.dt, idx_end*self.dt, self.dt)
+        self.t_L = np.arange(idx_start, idx_end) * self.dt
         self.SarPlot.clear()
         self.outlier_plot = None
         self.SarPlot.plot(self.t_L, self.L)
@@ -550,7 +556,7 @@ class MainWindow(QMainWindow):
             self.F = np.mean(fluo_roi, axis = 1)
         else:
             self.F = np.sum(fluo_roi, axis = 1)
-        self.t_F = np.arange(idx_start*self.dt,idx_end*self.dt,self.dt)
+        self.t_F = np.arange(idx_start, idx_end) * self.dt
         self.LinePlot.clear()
         self.LinePlot.plot(self.t_F, self.F)
         self.LinePlot.autoRange()
@@ -862,12 +868,21 @@ class MainWindow(QMainWindow):
         
     def SetImageViewer(self):
         self.img_viewer.clear()
-        lut = [qRgb(0,i,0) for i in range(256)]
-        self.img_viewer.addTab(ImageViewer(self.fluo_image,False,lut,self),"Fluo")
+        lut = [qRgb(0, i, 0) for i in range(256)]
+        is_uint16 = self.fluo_image.dtype == "uint16"
+        if is_uint16:
+            fluo_view = (self.fluo_image / 256).astype("uint8")
+            trans_view = (self.trans_image / 256).astype("uint8")
+            norm = 65535.0
+        else:
+            fluo_view = self.fluo_image
+            trans_view = self.trans_image
+            norm = 255.0
+        self.img_viewer.addTab(ImageViewer(fluo_view, False, lut, self), "Fluo")
+        self.img_viewer.addTab(ImageViewer(trans_view, True, lut, self), "Trans")
         self.fluo_image = self.fluo_image.astype("float64")
-        self.fluo_image /= 255.0
+        self.fluo_image /= norm
         self.img_viewer.widget(0).img.mouse_coord.connect(self.SetInfo)
-        self.img_viewer.addTab(ImageViewer(self.trans_image,True,lut,self),"Trans")
         self.img_viewer.widget(1).img.mouse_coord.connect(self.SetInfo)
         self.SyncChannelsViewers()
         
@@ -911,5 +926,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
